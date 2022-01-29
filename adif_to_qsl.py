@@ -1,4 +1,4 @@
-import adif_io
+import adif_io # https://gitlab.com/andreas_krueger_py/adif_io
 import json
 import subprocess
 import secrets
