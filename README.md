@@ -8,7 +8,7 @@ Copyright 2022, Brendan O'Connor, licensed under BSD 2-Clause for everything exc
 
 `imb.py` is also licensed under the BSD 2-clause, but is taken with extreme gratitude from <https://github.com/samrushing/pyimb>. I've made minimal changes to fix a few linting and py2to3 bugs, but all the work is theirs.
 
-`USPSIMBStandard.ttf` is available as part of the `uspsFontsNonAFP-1.4.0.zip` file from <https://postalpro.usps.com/onecodesolution>. It comes with a license agreement, however (and this isn't legal advice) it's not at all clear to me that it's valid because the US federal government can't copyright things---everything they do is in the public domain by default. So... do as you will.
+`USPSIMBStandard.ttf` is available as part of the `uspsFontsNonAFP-1.4.0.zip` file from <https://postalpro.usps.com/onecodesolution>. It comes with a license agreement, however (and this isn't legal advice) it's not at all clear to me that it's valid because the US federal government can't copyright things---everything they do is in the public domain by default. (One hilarious exception is stamps, and go ask an IP attorney why. I'm just a country ham radio operator....) So... do as you will.
 
 ## Prerequisites
 
