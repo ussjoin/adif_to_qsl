@@ -4,22 +4,26 @@ from wand.image import Image, UNIT_TYPES
 from wand.drawing import Drawing
 from wand.color import Color
 
-import brother_ql # https://brother-ql.net/
+# import brother_ql # https://brother-ql.net/
 import json
 import subprocess
 import secrets
 from datetime import datetime
+import argparse
 
 import imb
 import qsl_config
 
-# Don't turn the label file, don't do more than one, don't print anything
-DEBUG = False
+parser = argparse.ArgumentParser(description='Turn an ADIF into QSL card labels.')
 
+parser.add_argument('file', metavar="filename", help='the path to the ADIF file', type=open)
+parser.add_argument('-d', '--debug', action='store_true', help='run in debug mode (do not print, exit after one label)')
 
-#qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/LotW/Uploaded Logs/Smol/2022-01-28 WSJTX-Smol.adif")
+args = parser.parse_args()
 
-qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/LotW/Uploaded Logs/Smol/POTA/K3QB@K-3270-20220116.adif")
+DEBUG = args.debug
+
+qsos_raw, adif_header = adif_io.read_from_string(args.file.read())
 
 # What we need for a QSL Card:
 ## Date
