@@ -8,6 +8,7 @@ import brother_ql # https://brother-ql.net/
 import json
 import subprocess
 import secrets
+from datetime import datetime
 
 import imb
 import qsl_config
@@ -152,3 +153,6 @@ for qso in qsos_parsed:
     if not DEBUG:
         subprocess.run(["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"], shell=True)
         subprocess.run([f"brother_ql_print labelout.bin {qsl_config.PRINTER_IDENTIFIER}"], shell=True)
+
+with open(f"mailing-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.json", "w") as f:
+    f.write(json.dumps(qsos_parsed, indent=4))
