@@ -52,6 +52,9 @@ for qso in qsos_raw:
     q_p['time'] = f"{q_p['time'][0:2]}:{q_p['time'][2:4]}:{q_p['time'][4:6]}Z"
     
     q_p['qth'] = qso.get('MY_GRIDSQUARE')
+    if len(q_p['qth']) < 4:
+        print(f"The QSO with {q_p['callsign']} does not contain a MY_GRIDSQUARE, quitting.")
+        exit(1)
     q_p['frequency'] = qso.get('FREQ')
     q_p['power'] = qso.get('TX_PWR')
     if q_p['power'] and q_p['power'][-1].upper() != "W":
