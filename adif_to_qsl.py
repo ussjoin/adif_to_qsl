@@ -13,9 +13,9 @@ import imb
 import qsl_config
 
 
-#qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/LotW/Uploaded Logs/Smol/2022-01-28 WSJTX-Smol.adif")
+qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/LotW/Uploaded Logs/Smol/2022-01-28 WSJTX-Smol.adif")
 
-qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/LotW/Uploaded Logs/Smol/POTA/K3QB@K-3270-20220116.adif")
+#qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/LotW/Uploaded Logs/Smol/POTA/K3QB@K-3270-20220116.adif")
 
 # What we need for a QSL Card:
 ## Date
@@ -36,6 +36,8 @@ qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/L
 ## Their City [16]
 ## Their State [17]
 ## Their Zip [18]
+
+qsos_skipped = []
 
 qsos_parsed = []
 
@@ -66,6 +68,10 @@ for qso in qsos_parsed:
     sub = subprocess.run(f"grep '|{qso['callsign']}|' EN.dat | tail -n 1", shell=True, stdout=subprocess.PIPE)
     subprocess_return = sub.stdout.decode('UTF-8').strip()
     row = subprocess_return.split('|')
+    if len(row) < 20:
+        print(f"=====\nCan't find a name/address for {qso['callsign']}, skipping!\n=====")
+        qsos_skipped.append(qso['callsign'])
+        continue
     qso['firstname'] = row[8].title()
     qso['lastname'] = row[10].title()
     qso['address'] = row[15].title()
@@ -75,9 +81,14 @@ for qso in qsos_parsed:
         qso['zip'] = f"{row[18][0:5]}-{row[18][5:9]}"
     else:
         qso['zip'] = f"{row[18][0:5]}"
+    
+    # PO boxes are, hilariously, stored in a weird way; see, e.g., W7WIL, who has PO Box 1651.
+    if len(qso['address']) < 5 and len(row[19]) >= 1:
+        qso['address'] = f"PO Box {row[19]}"
+    
     qso['serial'] = f"{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}"
     qso['imbcode'] = imb.encode(int(qsl_config.BARCODE_ID), int(qsl_config.SERVICE_ID), int(qsl_config.MY_MAILER_ID), int(qso['serial']), row[18])
-    print(json.dumps(qso,indent=4))
+    # print(json.dumps(qso,indent=4))
     
     # 4.75" wide, 2.4" tall @ 300dpi would be 1425x720. However, Wand seems to ignore my please for resolution = 300.
     # Hence trying it at 72 so I don't lose my mind.
@@ -120,13 +131,14 @@ for qso in qsos_parsed:
         img.rotate(90)
         img.save(filename='temp.png')
     
+    subprocess.run(["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"], shell=True)
+    subprocess.run(["brother_ql_print labelout.bin usb://0x04f9:0x209b"], shell=True)
     
-    exit(0) # TODO
-
-    
-    # subprocess.run(["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"], shell=True)
-    # subprocess.run(["brother_ql_print labelout.bin usb://0x04f9:0x209b"], shell=True)
-    
-
+# Finally, re-print the list of skipped QSOs
+print("====================================================")
+print("Remember, I was unable to print QSOs for:")
+for n in qsos_skipped:
+    print(n)
+print("====================================================")
 
 #print(json.dumps(qsos_parsed,indent=4))
