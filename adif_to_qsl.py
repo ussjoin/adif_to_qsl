@@ -12,6 +12,9 @@ import secrets
 import imb
 import qsl_config
 
+# Don't turn the label file, don't do more than one, don't print anything
+DEBUG = False
+
 
 #qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/LotW/Uploaded Logs/Smol/2022-01-28 WSJTX-Smol.adif")
 
@@ -55,6 +58,10 @@ for qso in qsos_raw:
         q_p['power'] = f"{q_p['power']}W"
     q_p['mode'] = qso.get('MODE')
     q_p['signal'] = f"S{qso.get('RST_SENT')} R{qso.get('RST_RCVD')}"
+    # If there weren't signal reports, Python handles that by setting it as "SNone RNone".
+    # Change that to just a blank.
+    if q_p['signal'] == "SNone RNone":
+        q_p['signal'] = ""
     
     q_p['notes'] = qso.get('MY_SIG_INFO')
     if q_p['notes']:
@@ -111,15 +118,14 @@ for qso in qsos_parsed:
             draw_name.font_size = 55
             draw_name.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.0), name_text)
             draw_name(img)
-        
-        
+
             address_text = f"{qso['address']}\n{qso['city']}, {qso['state']} {qso['zip']}"
             draw_address = Drawing()
             draw_address.font = './Inconsolata-Regular.ttf'
             draw_address.font_size = 50
             draw_address.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.2), address_text)
             draw_address(img)
-        
+
             draw_imb = Drawing()
             draw_imb.font = './USPSIMBStandard.ttf'
             draw_imb.font_size = 54
@@ -133,8 +139,12 @@ for qso in qsos_parsed:
             draw_name.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.0), name_text)
             draw_name(img)
         
-        img.rotate(90)
+        if not DEBUG:
+            img.rotate(90)
         img.save(filename='temp.png')
+        if DEBUG:
+            exit()
     
-    subprocess.run(["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"], shell=True)
-    subprocess.run([f"brother_ql_print labelout.bin {qsl_config.PRINTER_IDENTIFIER}"], shell=True)
+    if not DEBUG:
+        subprocess.run(["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"], shell=True)
+        subprocess.run([f"brother_ql_print labelout.bin {qsl_config.PRINTER_IDENTIFIER}"], shell=True)
