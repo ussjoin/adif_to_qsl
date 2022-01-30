@@ -1,4 +1,10 @@
 import adif_io # https://gitlab.com/andreas_krueger_py/adif_io
+# https://docs.wand-py.org/
+from wand.image import Image, UNIT_TYPES
+from wand.drawing import Drawing
+from wand.color import Color
+
+import brother_ql # https://brother-ql.net/
 import json
 import subprocess
 import secrets
@@ -52,7 +58,7 @@ for qso in qsos_raw:
     
     q_p['notes'] = qso.get('MY_SIG_INFO')
     if q_p['notes']:
-        q_p['notes'] = f"POTA Activation: {q_p['notes']}"
+        q_p['notes'] = f"POTA Activation\nfrom {q_p['notes']}"
     
     qsos_parsed.append(q_p)
 
@@ -72,6 +78,54 @@ for qso in qsos_parsed:
     qso['serial'] = f"{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}"
     qso['imbcode'] = imb.encode(int(qsl_config.BARCODE_ID), int(qsl_config.SERVICE_ID), int(qsl_config.MY_MAILER_ID), int(qso['serial']), row[18])
     print(json.dumps(qso,indent=4))
+    
+    # 4.75" wide, 2.4" tall @ 300dpi would be 1425x720. However, Wand seems to ignore my please for resolution = 300.
+    # Hence trying it at 72 so I don't lose my mind.
+    DRAW_RESOLUTION = 290
+    START_RESOLUTION = 72
+    with Image(width=int(DRAW_RESOLUTION * 4.75), height=int(DRAW_RESOLUTION * 2.4), background = Color('white')) as img:
+        # Build the QSL bits, then the address and IMb
+        # 2.5" wide left half, 2.25" wide right half ("half")
+        qso_text = f"{qso['date']}\n{qso['time']}\n\n{qso['qth']}\n{qso['frequency']}\n{qso['power']}\n{qso['mode']}\n{qso['signal']}"
+        if qso['notes']:
+            qso_text += f"\n\n{qso['notes']}"
+        draw_qso = Drawing()
+        draw_qso.font = './Inconsolata-Regular.ttf'
+        draw_qso.font_size = 60
+        draw_qso.text(int(DRAW_RESOLUTION * 0.1), int(DRAW_RESOLUTION * 0.15), qso_text)
+        
+        name_text = f"{qso['firstname']} {qso['lastname']}, {qso['callsign']}"
+        draw_name = Drawing()
+        draw_name.font = './Inconsolata-Bold.ttf'
+        draw_name.font_size = 55
+        draw_name.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.0), name_text)
+        
+        
+        address_text = f"{qso['address']}\n{qso['city']}, {qso['state']} {qso['zip']}"
+        draw_address = Drawing()
+        draw_address.font = './Inconsolata-Regular.ttf'
+        draw_address.font_size = 50
+        draw_address.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.2), address_text)
+        
+        draw_imb = Drawing()
+        draw_imb.font = './USPSIMBStandard.ttf'
+        draw_imb.font_size = 54
+        draw_imb.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.5), qso['imbcode'])
+        
+        
+        draw_qso(img)
+        draw_name(img)
+        draw_address(img)
+        draw_imb(img)
+        img.rotate(90)
+        img.save(filename='temp.png')
+    
+    
+    exit(0) # TODO
+
+    
+    # subprocess.run(["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"], shell=True)
+    # subprocess.run(["brother_ql_print labelout.bin usb://0x04f9:0x209b"], shell=True)
     
 
 
