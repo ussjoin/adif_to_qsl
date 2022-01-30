@@ -18,6 +18,8 @@ You need a USPS Mailer ID so that you can create an Intelligent Mail Barcode. Se
 
 You need to download the FCC ULS database from <https://www.fcc.gov/uls/transactions/daily-weekly>. You need the weekly dump from the Amateur Radio Service. Take the `EN.dat` file and put it in the local directory. (It's 180MB and changes weekly, so it's not great to check in.)
 
+You need a Brother label printer supported by the <https://brother-ql.net/> project, loaded with 2.4" wide roll labels. If you need a different width, that's fine, but you'll need to change the layout section yourself.
+
 ## How to Use
 
 The force? (Coming)

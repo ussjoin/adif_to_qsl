@@ -37,8 +37,6 @@ qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/L
 ## Their State [17]
 ## Their Zip [18]
 
-qsos_skipped = []
-
 qsos_parsed = []
 
 for qso in qsos_raw:
@@ -68,32 +66,32 @@ for qso in qsos_parsed:
     sub = subprocess.run(f"grep '|{qso['callsign']}|' EN.dat | tail -n 1", shell=True, stdout=subprocess.PIPE)
     subprocess_return = sub.stdout.decode('UTF-8').strip()
     row = subprocess_return.split('|')
+    
+    has_address = False
+    
     if len(row) < 20:
-        print(f"=====\nCan't find a name/address for {qso['callsign']}, skipping!\n=====")
-        qsos_skipped.append(qso['callsign'])
-        continue
-    qso['firstname'] = row[8].title()
-    qso['lastname'] = row[10].title()
-    qso['address'] = row[15].title()
-    qso['city'] = row[16].title()
-    qso['state'] = row[17]
-    if len(row[18]) > 5:
-        qso['zip'] = f"{row[18][0:5]}-{row[18][5:9]}"
+        print(f"=====\nCan't find a name/address for {qso['callsign']}, printing label without that!\n=====")
     else:
-        qso['zip'] = f"{row[18][0:5]}"
+        has_address = True
+        qso['firstname'] = row[8].title()
+        qso['lastname'] = row[10].title()
+        qso['address'] = row[15].title()
+        qso['city'] = row[16].title()
+        qso['state'] = row[17]
+        if len(row[18]) > 5:
+            qso['zip'] = f"{row[18][0:5]}-{row[18][5:9]}"
+        else:
+            qso['zip'] = f"{row[18][0:5]}"
     
-    # PO boxes are, hilariously, stored in a weird way; see, e.g., W7WIL, who has PO Box 1651.
-    if len(qso['address']) < 5 and len(row[19]) >= 1:
-        qso['address'] = f"PO Box {row[19]}"
+        # PO boxes are, hilariously, stored in a weird way; see, e.g., W7WIL, who has PO Box 1651.
+        if len(qso['address']) < 5 and len(row[19]) >= 1:
+            qso['address'] = f"PO Box {row[19]}"
     
-    qso['serial'] = f"{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}"
-    qso['imbcode'] = imb.encode(int(qsl_config.BARCODE_ID), int(qsl_config.SERVICE_ID), int(qsl_config.MY_MAILER_ID), int(qso['serial']), row[18])
-    # print(json.dumps(qso,indent=4))
+        qso['serial'] = f"{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}"
+        qso['imbcode'] = imb.encode(int(qsl_config.BARCODE_ID), int(qsl_config.SERVICE_ID), int(qsl_config.MY_MAILER_ID), int(qso['serial']), row[18])
     
-    # 4.75" wide, 2.4" tall @ 300dpi would be 1425x720. However, Wand seems to ignore my please for resolution = 300.
-    # Hence trying it at 72 so I don't lose my mind.
+    # 4.75" wide, 2.4" tall, and brother_ql expects 290 dpi for this.
     DRAW_RESOLUTION = 290
-    START_RESOLUTION = 72
     with Image(width=int(DRAW_RESOLUTION * 4.75), height=int(DRAW_RESOLUTION * 2.4), background = Color('white')) as img:
         # Build the QSL bits, then the address and IMb
         # 2.5" wide left half, 2.25" wide right half ("half")
@@ -104,41 +102,39 @@ for qso in qsos_parsed:
         draw_qso.font = './Inconsolata-Regular.ttf'
         draw_qso.font_size = 60
         draw_qso.text(int(DRAW_RESOLUTION * 0.1), int(DRAW_RESOLUTION * 0.15), qso_text)
-        
-        name_text = f"{qso['firstname']} {qso['lastname']}, {qso['callsign']}"
-        draw_name = Drawing()
-        draw_name.font = './Inconsolata-Bold.ttf'
-        draw_name.font_size = 55
-        draw_name.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.0), name_text)
-        
-        
-        address_text = f"{qso['address']}\n{qso['city']}, {qso['state']} {qso['zip']}"
-        draw_address = Drawing()
-        draw_address.font = './Inconsolata-Regular.ttf'
-        draw_address.font_size = 50
-        draw_address.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.2), address_text)
-        
-        draw_imb = Drawing()
-        draw_imb.font = './USPSIMBStandard.ttf'
-        draw_imb.font_size = 54
-        draw_imb.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.5), qso['imbcode'])
-        
-        
         draw_qso(img)
-        draw_name(img)
-        draw_address(img)
-        draw_imb(img)
+        
+        if has_address: # They're in the FCC DB        
+            name_text = f"{qso['firstname']} {qso['lastname']}, {qso['callsign']}"
+            draw_name = Drawing()
+            draw_name.font = './Inconsolata-Bold.ttf'
+            draw_name.font_size = 55
+            draw_name.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.0), name_text)
+            draw_name(img)
+        
+        
+            address_text = f"{qso['address']}\n{qso['city']}, {qso['state']} {qso['zip']}"
+            draw_address = Drawing()
+            draw_address.font = './Inconsolata-Regular.ttf'
+            draw_address.font_size = 50
+            draw_address.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.2), address_text)
+            draw_address(img)
+        
+            draw_imb = Drawing()
+            draw_imb.font = './USPSIMBStandard.ttf'
+            draw_imb.font_size = 54
+            draw_imb.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.5), qso['imbcode'])
+            draw_imb(img)
+        else: # Just draw a callsign and the rest of the label, nothing else
+            name_text = f"{qso['callsign']}"
+            draw_name = Drawing()
+            draw_name.font = './Inconsolata-Bold.ttf'
+            draw_name.font_size = 55
+            draw_name.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.0), name_text)
+            draw_name(img)
+        
         img.rotate(90)
         img.save(filename='temp.png')
     
     subprocess.run(["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"], shell=True)
     subprocess.run([f"brother_ql_print labelout.bin {qsl_config.PRINTER_IDENTIFIER}"], shell=True)
-    
-# Finally, re-print the list of skipped QSOs
-print("====================================================")
-print("Remember, I was unable to print QSOs for:")
-for n in qsos_skipped:
-    print(n)
-print("====================================================")
-
-#print(json.dumps(qsos_parsed,indent=4))
