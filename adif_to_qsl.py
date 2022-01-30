@@ -13,9 +13,9 @@ import imb
 import qsl_config
 
 
-qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/LotW/Uploaded Logs/Smol/2022-01-28 WSJTX-Smol.adif")
+#qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/LotW/Uploaded Logs/Smol/2022-01-28 WSJTX-Smol.adif")
 
-#qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/LotW/Uploaded Logs/Smol/POTA/K3QB@K-3270-20220116.adif")
+qsos_raw, adif_header = adif_io.read_from_file("/Users/ussjoin/Desktop/Dropbox/LotW/Uploaded Logs/Smol/POTA/K3QB@K-3270-20220116.adif")
 
 # What we need for a QSL Card:
 ## Date
@@ -132,7 +132,7 @@ for qso in qsos_parsed:
         img.save(filename='temp.png')
     
     subprocess.run(["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"], shell=True)
-    subprocess.run(["brother_ql_print labelout.bin usb://0x04f9:0x209b"], shell=True)
+    subprocess.run([f"brother_ql_print labelout.bin {qsl_config.PRINTER_IDENTIFIER}"], shell=True)
     
 # Finally, re-print the list of skipped QSOs
 print("====================================================")
