@@ -36,7 +36,8 @@ def parse_adif(file_object):
 
     Given a file-like object (on which it can call read()), generate an array full of QSOs.
 
-    Returns: an array of dicts, where each dict is a single QSO, augmented with FCC data if available.
+    Returns: an array of dicts, where each dict is a single QSO, augmented with FCC data
+    if available.
 
     """
     # [0] because the read_from_string() returns a tuple of qsos_raw, adif_header
@@ -98,7 +99,8 @@ def parse_adif(file_object):
         if q_p['notes']:
             q_p['notes'] = f"POTA Activation\nfrom {q_p['notes']}"
 
-        res = cur.execute(f'SELECT * from amateurs where callsign = \"{q_p["callsign"]}\" and active = 1;').fetchall()
+        res = cur.execute(f'SELECT * from amateurs where callsign = \"{q_p["callsign"]}\" ' +
+            'and active = 1;').fetchall()
         if len(res) > 1:
             print("==========ERROR==========")
             print(f"While finding FCC records for {q_p['callsign']}, I found more than one " +
@@ -106,7 +108,8 @@ def parse_adif(file_object):
             "terminating and letting you figure it out.")
             sys.exit(1)
         elif len(res) == 0:
-            print(f"=====\nCan't find a name/address for {q_p['callsign']}, printing label without that!\n=====")
+            print(f"=====\nCan't find a name/address for {q_p['callsign']}. " +
+                "Printing label without that!\n=====")
             q_p['has_address'] = False
         else:
             row = res[0]
@@ -127,7 +130,7 @@ def parse_adif(file_object):
                                         int(qsl_config.MY_MAILER_ID),
                                         int(q_p['serial']),
                                         row['zipcode'])
-        
+
         qsos_parsed.append(q_p)
     return qsos_parsed
 
