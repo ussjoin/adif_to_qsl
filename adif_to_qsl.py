@@ -85,7 +85,7 @@ def parse_adif(file_object):
         res = cur.execute(f'SELECT * from amateurs where callsign = \"{qso["callsign"]}\" and active = 1;').fetchall()
         if len(res) > 1:
             print("==========ERROR==========")
-            print(f"While finding FCC records for {callsign}, I found more than one simultaneous active record.")
+            print(f"While finding FCC records for {qso['callsign']}, I found more than one simultaneous active record.")
             print("Since this really should never, ever happen, I am terminating and letting you figure it out.")
             exit(1)
         elif len(res) == 0:
