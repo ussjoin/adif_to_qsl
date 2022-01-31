@@ -81,11 +81,7 @@ def parse_adif(file_object):
         qsos_parsed.append(q_p)
 
     for qso in qsos_parsed:
-        
-        # sub = subprocess.run(f"grep '|{qso['callsign']}|' EN.dat | tail -n 1", shell=True, stdout=subprocess.PIPE)
-        # subprocess_return = sub.stdout.decode('UTF-8').strip()
-        # row = subprocess_return.split('|')
-        
+                
         res = cur.execute(f'SELECT * from amateurs where callsign = \"{qso["callsign"]}\" and active = 1;').fetchall()
         if len(res) > 1:
             print("==========ERROR==========")
