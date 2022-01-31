@@ -18,11 +18,14 @@ You need a USPS Mailer ID so that you can create an Intelligent Mail Barcode. Se
 
 You need to download the FCC ULS database from <https://www.fcc.gov/uls/transactions/daily-weekly>. You need the weekly dump from the Amateur Radio Service. Take the `EN.dat` and `HD.dat` files and put them in the local directory. (The dump changes weekly, so it's not great to check in.)
 
-You need a Brother label printer supported by the <https://brother-ql.net/> project, loaded with 2.4" wide roll labels. If you need a different width, that's fine, but you'll need to change the layout section yourself.
+You need a Brother label printer supported by the <https://brother-ql.net/> project, loaded with 2.4" wide roll labels. If you need a different width, that's fine, but you'll need to change the layout section yourself (`print_qsos()` in `adif_to_qsl.py`).
 
 ## How to Use
 
 ### Initial Setup
+
+Edit `qsl_config.py` to contain your IMb [Mailer ID](https://gateway.usps.com/eAdmin/view/knowledge?securityId=MID) and the USB identifier of your Brother label printer. (The one provided is for a Brother QL-800, so if that's what you have, it's fine; if not, use `lsusb` (Linux) or System Report (macOS) to get the Vendor ID and Product ID for your device.)
+
 
 `./adif_to_qsl.py --parse-db`
 
