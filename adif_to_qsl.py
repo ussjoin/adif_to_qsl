@@ -23,6 +23,9 @@ DEBUG = False
 
 def parse_adif(file_object):
     qsos_raw, adif_header = adif_io.read_from_string(file_object.read())
+    con = sqlite3.connect('uls.db')
+    con.row_factory = sqlite3.Row # Allows use of dictionary lookups on returns, see https://stackoverflow.com/a/3300514
+    cur = con.cursor()
 
     # What we need for a QSL Card:
     ## Date
@@ -78,31 +81,35 @@ def parse_adif(file_object):
         qsos_parsed.append(q_p)
 
     for qso in qsos_parsed:
-        sub = subprocess.run(f"grep '|{qso['callsign']}|' EN.dat | tail -n 1", shell=True, stdout=subprocess.PIPE)
-        subprocess_return = sub.stdout.decode('UTF-8').strip()
-        row = subprocess_return.split('|')
-    
-        if len(row) < 20:
+        
+        # sub = subprocess.run(f"grep '|{qso['callsign']}|' EN.dat | tail -n 1", shell=True, stdout=subprocess.PIPE)
+        # subprocess_return = sub.stdout.decode('UTF-8').strip()
+        # row = subprocess_return.split('|')
+        
+        res = cur.execute(f'SELECT * from amateurs where callsign = \"{qso["callsign"]}\" and active = 1;').fetchall()
+        if len(res) > 1:
+            print("==========ERROR==========")
+            print(f"While finding FCC records for {callsign}, I found more than one simultaneous active record.")
+            print("Since this really should never, ever happen, I am terminating and letting you figure it out.")
+            exit(1)
+        elif len(res) == 0:
             print(f"=====\nCan't find a name/address for {qso['callsign']}, printing label without that!\n=====")
             qso['has_address'] = False
         else:
+            row = res[0]
             qso['has_address'] = True
-            qso['firstname'] = row[8].title()
-            qso['lastname'] = row[10].title()
-            qso['address'] = row[15].title()
-            qso['city'] = row[16].title()
-            qso['state'] = row[17]
-            if len(row[18]) > 5:
-                qso['zip'] = f"{row[18][0:5]}-{row[18][5:9]}"
+            qso['firstname'] = row['firstname'].title()
+            qso['lastname'] = row['lastname'].title()
+            qso['address'] = row['address'].title()
+            qso['city'] = row['city'].title()
+            qso['state'] = row['state']
+            if len(row['zipcode']) > 5:
+                qso['zip'] = f"{row['zipcode'][0:5]}-{row['zipcode'][5:9]}"
             else:
-                qso['zip'] = f"{row[18][0:5]}"
-    
-            # PO boxes are, hilariously, stored in a weird way; see, e.g., W7WIL, who has PO Box 1651.
-            if len(qso['address']) < 5 and len(row[19]) >= 1:
-                qso['address'] = f"PO Box {row[19]}"
+                qso['zip'] = f"{row['zipcode'][0:5]}"
     
             qso['serial'] = f"{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}"
-            qso['imbcode'] = imb.encode(int(qsl_config.BARCODE_ID), int(qsl_config.SERVICE_ID), int(qsl_config.MY_MAILER_ID), int(qso['serial']), row[18])
+            qso['imbcode'] = imb.encode(int(qsl_config.BARCODE_ID), int(qsl_config.SERVICE_ID), int(qsl_config.MY_MAILER_ID), int(qso['serial']), row['zipcode'])
     return qsos_parsed
     
 def print_qsos(qsos_parsed):
@@ -179,15 +186,12 @@ def parse_db():
         record['address'] = row[15].title().replace('"', '')
         record['city'] = row[16].title().replace('"', '')
         record['state'] = row[17].replace('"', '')
+        record['zipcode'] = row[18]
         
-        if len(row[18]) > 5:
-            record['zipcode'] = f"{row[18][0:5]}-{row[18][5:9]}"
-        else:
-            record['zipcode'] = f"{row[18][0:5]}"
-
         # PO boxes are, hilariously, stored in a weird way; see, e.g., W7WIL, who has PO Box 1651.
         if len(record['address']) < 5 and len(row) > 19 and len(row[19]) >= 1:
-            record['address'] = f"PO Box {row[19]}"
+            pobox = row[19].replace('"', '')
+            record['address'] = f"PO Box {pobox}"
         
         #print(f"I found Operator {firstname} {lastname}, {callsign}, at {address}, {city}, {state} {zipcode}.")
         records[record['identifier']] = record
@@ -207,11 +211,11 @@ def parse_db():
     con = sqlite3.connect('uls.db')
     cur = con.cursor()
     # Create table
-    cur.execute('''CREATE TABLE IF NOT EXISTS amateurs (identifier text, callsign text, firstname text, lastname text, city text, state text, zipcode text, active integer DEFAULT 0)''')
+    cur.execute('''CREATE TABLE IF NOT EXISTS amateurs (identifier text, callsign text, firstname text, lastname text, address text, city text, state text, zipcode text, active integer DEFAULT 0)''')
     con.commit()
     
     for record in records.values():
-        sqlstring = f"INSERT INTO amateurs (identifier, callsign, firstname, lastname, city, state, zipcode, active) VALUES (\"{record['identifier']}\", \"{record['callsign']}\", \"{record['firstname']}\", \"{record['lastname']}\", \"{record['city']}\", \"{record['state']}\", \"{record['zipcode']}\", {record['active']});"
+        sqlstring = f"INSERT INTO amateurs (identifier, callsign, firstname, lastname, address, city, state, zipcode, active) VALUES (\"{record['identifier']}\", \"{record['callsign']}\", \"{record['firstname']}\", \"{record['lastname']}\", \"{record['address']}\", \"{record['city']}\", \"{record['state']}\", \"{record['zipcode']}\", {record['active']});"
         #print(sqlstring)
         cur.execute(sqlstring)
 
@@ -232,7 +236,7 @@ if __name__ == "__main__":
         parse_db()
     elif args.file:
         qsos = parse_adif(args.file)
-        print_qsos(qsos)
+        #print_qsos(qsos)
         dump_qsos(qsos)
     else:
         exit(1)
