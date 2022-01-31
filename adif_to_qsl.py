@@ -1,4 +1,9 @@
 #! env python3
+"""
+This program takes an ADIF file and turns it into QSL card labels or images thereof.
+
+"""
+
 
 import argparse
 import csv
@@ -27,7 +32,16 @@ QSL_CARD_PATH = 'qsl_cards/'
 
 
 def parse_adif(file_object):
-    qsos_raw, adif_header = adif_io.read_from_string(file_object.read())
+    """parse_adif(file_object):
+
+    Given a file-like object (on which it can call read()), generate an array full of QSOs.
+
+    Returns: an array of dicts, where each dict is a single QSO, augmented with FCC data if available.
+
+    """
+    # [0] because the read_from_string() returns a tuple of qsos_raw, adif_header
+    # (We don't need the headers for this, so just dropping them on the floor)
+    qsos_raw = adif_io.read_from_string(file_object.read())[0]
     con = sqlite3.connect('uls.db')
     # Allows use of dictionary lookups on returns, see https://stackoverflow.com/a/3300514
     con.row_factory = sqlite3.Row
@@ -84,40 +98,46 @@ def parse_adif(file_object):
         if q_p['notes']:
             q_p['notes'] = f"POTA Activation\nfrom {q_p['notes']}"
 
-        qsos_parsed.append(q_p)
-
-    for qso in qsos_parsed:
-        res = cur.execute(f'SELECT * from amateurs where callsign = \"{qso["callsign"]}\" and active = 1;').fetchall()
+        res = cur.execute(f'SELECT * from amateurs where callsign = \"{q_p["callsign"]}\" and active = 1;').fetchall()
         if len(res) > 1:
             print("==========ERROR==========")
-            print(f"While finding FCC records for {qso['callsign']}, I found more than one simultaneous active record.")
-            print("Since this really should never, ever happen, I am terminating and letting you figure it out.")
+            print(f"While finding FCC records for {q_p['callsign']}, I found more than one " +
+            "simultaneous active record. Since this really should never, ever happen, I am " +
+            "terminating and letting you figure it out.")
             sys.exit(1)
         elif len(res) == 0:
-            print(f"=====\nCan't find a name/address for {qso['callsign']}, printing label without that!\n=====")
-            qso['has_address'] = False
+            print(f"=====\nCan't find a name/address for {q_p['callsign']}, printing label without that!\n=====")
+            q_p['has_address'] = False
         else:
             row = res[0]
-            qso['has_address'] = True
-            qso['firstname'] = row['firstname'].title()
-            qso['lastname'] = row['lastname'].title()
-            qso['address'] = row['address'].title()
-            qso['city'] = row['city'].title()
-            qso['state'] = row['state']
+            q_p['has_address'] = True
+            q_p['firstname'] = row['firstname'].title()
+            q_p['lastname'] = row['lastname'].title()
+            q_p['address'] = row['address'].title()
+            q_p['city'] = row['city'].title()
+            q_p['state'] = row['state']
             if len(row['zipcode']) > 5:
-                qso['zip'] = f"{row['zipcode'][0:5]}-{row['zipcode'][5:9]}"
+                q_p['zip'] = f"{row['zipcode'][0:5]}-{row['zipcode'][5:9]}"
             else:
-                qso['zip'] = f"{row['zipcode'][0:5]}"
+                q_p['zip'] = f"{row['zipcode'][0:5]}"
 
-            qso['serial'] = f"{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}"
-            qso['imbcode'] = imb.encode(int(qsl_config.BARCODE_ID),
+            q_p['serial'] = f"{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}"
+            q_p['imbcode'] = imb.encode(int(qsl_config.BARCODE_ID),
                                         int(qsl_config.SERVICE_ID),
                                         int(qsl_config.MY_MAILER_ID),
-                                        int(qso['serial']),
+                                        int(q_p['serial']),
                                         row['zipcode'])
+            qsos_parsed.append(q_p)
     return qsos_parsed
 
 def print_qsos(qsos_parsed):
+    """print_qsos(qsos_parsed):
+
+    Given an array full of QSOs, generate images of QSO cards and/or print them to a label printer.
+
+    Returns: nothing.
+
+    """
     for qso in qsos_parsed:
         # 4.75" wide, 2.4" tall, and brother_ql expects 290 dpi for this.
         res = 290
@@ -178,12 +198,28 @@ def print_qsos(qsos_parsed):
                 os.remove('labelout.bin')
 
 def dump_qsos(qsos_parsed):
-    with open(f"mailing-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.json", "w") as f:
-        f.write(json.dumps(qsos_parsed, indent=4))
+    """dump_qsos(qsos_parsed):
+
+    Given an array full of QSOs, dump them as JSON to a file.
+    File is named mailing-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.json .
+
+    Returns: nothing.
+
+    """
+    with open(f"mailing-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.json", "w", encoding="latin-1") as json_file:
+        json_file.write(json.dumps(qsos_parsed, indent=4))
 
 def parse_db():
-    enfile = open('EN.dat', 'r')
-    hdfile = open('HD.dat', 'r')
+    """parse_db():
+
+    Parse EN.dat and HD.dat, in the current working directory, into a SQLite DB named uls.json.
+    Only pull out fields relevant to this program.
+
+    Returns: nothing.
+
+    """
+    enfile = open('EN.dat', 'r', encoding="latin-1")
+    hdfile = open('HD.dat', 'r', encoding="latin-1")
     records = {}
 
     print("Reading EN.dat")
