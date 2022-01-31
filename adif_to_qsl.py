@@ -1,13 +1,13 @@
 #! env python3
 
-import json
-import subprocess
-import secrets
-from datetime import datetime
 import argparse
 import csv
-import sqlite3
+from datetime import datetime
+import json
 import os
+import subprocess
+import secrets
+import sqlite3
 import sys
 
 import adif_io # https://gitlab.com/andreas_krueger_py/adif_io
@@ -15,7 +15,8 @@ from wand.image import Image # https://docs.wand-py.org/
 from wand.drawing import Drawing
 from wand.color import Color
 
-# import brother_ql # https://brother-ql.net/
+# https://brother-ql.net/ - this program calls the command-line utilities,
+#   but doesn't use them pythonically
 
 import imb
 import qsl_config
@@ -28,7 +29,8 @@ QSL_CARD_PATH = 'qsl_cards/'
 def parse_adif(file_object):
     qsos_raw, adif_header = adif_io.read_from_string(file_object.read())
     con = sqlite3.connect('uls.db')
-    con.row_factory = sqlite3.Row # Allows use of dictionary lookups on returns, see https://stackoverflow.com/a/3300514
+    # Allows use of dictionary lookups on returns, see https://stackoverflow.com/a/3300514
+    con.row_factory = sqlite3.Row
     cur = con.cursor()
 
     # What we need for a QSL Card:
@@ -108,14 +110,18 @@ def parse_adif(file_object):
                 qso['zip'] = f"{row['zipcode'][0:5]}"
 
             qso['serial'] = f"{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}"
-            qso['imbcode'] = imb.encode(int(qsl_config.BARCODE_ID), int(qsl_config.SERVICE_ID), int(qsl_config.MY_MAILER_ID), int(qso['serial']), row['zipcode'])
+            qso['imbcode'] = imb.encode(int(qsl_config.BARCODE_ID),
+                                        int(qsl_config.SERVICE_ID),
+                                        int(qsl_config.MY_MAILER_ID),
+                                        int(qso['serial']),
+                                        row['zipcode'])
     return qsos_parsed
 
 def print_qsos(qsos_parsed):
     for qso in qsos_parsed:
         # 4.75" wide, 2.4" tall, and brother_ql expects 290 dpi for this.
-        DRAW_RESOLUTION = 290
-        with Image(width=int(DRAW_RESOLUTION * 4.75), height=int(DRAW_RESOLUTION * 2.4), background = Color('white')) as img:
+        res = 290
+        with Image(width=int(res*4.75), height=int(res*2.4), background = Color('white')) as img:
             # Build the QSL bits, then the address and IMb
             # 2.5" wide left half, 2.25" wide right half ("half")
             qso_text = f"{qso['date']}\n{qso['time']}\n\n{qso['qth']}\n{qso['frequency']}\n{qso['power']}\n{qso['mode']}\n{qso['signal']}"
@@ -124,7 +130,7 @@ def print_qsos(qsos_parsed):
             draw_qso = Drawing()
             draw_qso.font = './Inconsolata-Regular.ttf'
             draw_qso.font_size = 60
-            draw_qso.text(int(DRAW_RESOLUTION * 0.1), int(DRAW_RESOLUTION * 0.15), qso_text)
+            draw_qso.text(int(res * 0.1), int(res * 0.15), qso_text)
             draw_qso(img)
 
             if qso['has_address']: # They're in the FCC DB
@@ -132,27 +138,27 @@ def print_qsos(qsos_parsed):
                 draw_name = Drawing()
                 draw_name.font = './Inconsolata-Bold.ttf'
                 draw_name.font_size = 55
-                draw_name.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.0), name_text)
+                draw_name.text(int(res * 2.0), int(res * 1.0), name_text)
                 draw_name(img)
 
                 address_text = f"{qso['address']}\n{qso['city']}, {qso['state']} {qso['zip']}"
                 draw_address = Drawing()
                 draw_address.font = './Inconsolata-Regular.ttf'
                 draw_address.font_size = 50
-                draw_address.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.2), address_text)
+                draw_address.text(int(res * 2.0), int(res * 1.2), address_text)
                 draw_address(img)
 
                 draw_imb = Drawing()
                 draw_imb.font = './USPSIMBStandard.ttf'
                 draw_imb.font_size = 54
-                draw_imb.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.5), qso['imbcode'])
+                draw_imb.text(int(res * 2.0), int(res * 1.5), qso['imbcode'])
                 draw_imb(img)
             else: # Just draw a callsign and the rest of the label, nothing else
                 name_text = f"{qso['callsign']}"
                 draw_name = Drawing()
                 draw_name.font = './Inconsolata-Bold.ttf'
                 draw_name.font_size = 55
-                draw_name.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.0), name_text)
+                draw_name.text(int(res * 2.0), int(res * 1.0), name_text)
                 draw_name(img)
 
             if MAKE_IMAGES:
@@ -163,8 +169,11 @@ def print_qsos(qsos_parsed):
             else:
                 img.rotate(90)
                 img.save(filename='temp.png')
-                subprocess.run(["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"], shell=True)
-                subprocess.run([f"brother_ql_print labelout.bin {qsl_config.PRINTER_IDENTIFIER}"], shell=True)
+                subprocess.run(
+                    ["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"],
+                    shell=True)
+                subprocess.run([f"brother_ql_print labelout.bin {qsl_config.PRINTER_IDENTIFIER}"],
+                    shell=True)
                 os.remove('temp.png')
                 os.remove('labelout.bin')
 
@@ -195,7 +204,6 @@ def parse_db():
             pobox = row[19].replace('"', '')
             record['address'] = f"PO Box {pobox}"
 
-        #print(f"I found Operator {firstname} {lastname}, {callsign}, at {address}, {city}, {state} {zipcode}.")
         records[record['identifier']] = record
 
     print("Reading HD.dat")
@@ -212,13 +220,18 @@ def parse_db():
     con = sqlite3.connect('uls.db')
     cur = con.cursor()
     # Create table
-    cur.execute('''CREATE TABLE IF NOT EXISTS amateurs (identifier text, callsign text, firstname text, lastname text, address text, city text, state text, zipcode text, active integer DEFAULT 0)''')
+    cur.execute("CREATE TABLE IF NOT EXISTS amateurs" +
+        "(identifier text, callsign text, firstname text, lastname text, address text, " +
+        "city text, state text, zipcode text, active integer DEFAULT 0)")
     con.commit()
 
     for record in records.values():
-        sqlstring = f"INSERT INTO amateurs (identifier, callsign, firstname, lastname, address, city, state, zipcode, active) VALUES (\"{record['identifier']}\", \"{record['callsign']}\", \"{record['firstname']}\", \"{record['lastname']}\", \"{record['address']}\", \"{record['city']}\", \"{record['state']}\", \"{record['zipcode']}\", {record['active']});"
-        #print(sqlstring)
-        cur.execute(sqlstring)
+        cur.execute(" INSERT INTO amateurs " +
+            "(identifier, callsign, firstname, lastname, address, city, state, zipcode, active) " +
+            f"VALUES (\"{record['identifier']}\", \"{record['callsign']}\", " +
+            f"\"{record['firstname']}\", \"{record['lastname']}\", \"{record['address']}\", " +
+            "\"{record['city']}\", \"{record['state']}\", \"{record['zipcode']}\", "+
+            "{record['active']});")
 
     con.commit()
     con.close()
@@ -226,9 +239,12 @@ def parse_db():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Turn an ADIF into QSL card labels.')
-    parser.add_argument('-f', '--file', metavar="filename", help='the path to the ADIF file', type=open)
-    parser.add_argument('-p', '--parse_db', action='store_true', help='parse an FCC EN.dat and HD.dat database into a local SQLite db called uls.db')
-    parser.add_argument('-i', '--output_images', action='store_true', help=f'Create images for every label and store them in a {QSL_CARD_PATH} directory, rather than printing.')
+    parser.add_argument('-f', '--file', metavar="filename",
+        help='the path to the ADIF file', type=open)
+    parser.add_argument('-p', '--parse_db', action='store_true',
+        help='parse an FCC EN.dat and HD.dat database into a local SQLite db called uls.db')
+    parser.add_argument('-i', '--output_images', action='store_true',
+        help=f'Create images and store them in a {QSL_CARD_PATH} directory. Do not print')
 
     args = parser.parse_args()
     MAKE_IMAGES = args.output_images
