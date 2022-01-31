@@ -14,11 +14,14 @@ from datetime import datetime
 import argparse
 import csv
 import sqlite3
+import os
 
 import imb
 import qsl_config
 
-DEBUG = False
+MAKE_IMAGES = False
+
+QSL_CARD_PATH = 'qsl_cards/'
 
 
 def parse_adif(file_object):
@@ -152,15 +155,20 @@ def print_qsos(qsos_parsed):
                 draw_name.text(int(DRAW_RESOLUTION * 2.0), int(DRAW_RESOLUTION * 1.0), name_text)
                 draw_name(img)
         
-            if not DEBUG:
+
+            if MAKE_IMAGES:
+                if not os.path.isdir(QSL_CARD_PATH):
+                    os.mkdir(QSL_CARD_PATH)
+                filepath = f"{QSL_CARD_PATH}{qso['callsign']}-{qso['date']}.png"
+                img.save(filename=filepath)
+            else:
                 img.rotate(90)
-            img.save(filename='temp.png')
-            if DEBUG:
-                exit()
-    
-        if not DEBUG:
-            subprocess.run(["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"], shell=True)
-            subprocess.run([f"brother_ql_print labelout.bin {qsl_config.PRINTER_IDENTIFIER}"], shell=True)
+                img.save(filename='temp.png')
+                subprocess.run(["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"], shell=True)
+                subprocess.run([f"brother_ql_print labelout.bin {qsl_config.PRINTER_IDENTIFIER}"], shell=True)
+                os.remove('temp.png')
+                os.remove('labelout.bin')
+                
 
 def dump_qsos(qsos_parsed):
     with open(f"mailing-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.json", "w") as f:
@@ -222,17 +230,18 @@ def parse_db():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Turn an ADIF into QSL card labels.')
     parser.add_argument('-f', '--file', metavar="filename", help='the path to the ADIF file', type=open)
-    parser.add_argument('-d', '--debug', action='store_true', help='run in debug mode (do not print, exit after one label)')
     parser.add_argument('-p', '--parse_db', action='store_true', help='parse an FCC EN.dat and HD.dat database into a local SQLite db called uls.db')
+    parser.add_argument('-i', '--output_images', action='store_true', help=f'Create images for every label and store them in a {QSL_CARD_PATH} directory, rather than printing.')
 
     args = parser.parse_args()
-    DEBUG = args.debug
+    MAKE_IMAGES = args.output_images
     
     if args.parse_db:
         parse_db()
     elif args.file:
         qsos = parse_adif(args.file)
-        #print_qsos(qsos)
+        print_qsos(qsos)
         dump_qsos(qsos)
     else:
+        print("You need to either use the -f option or the -p option. Use -h for help.")
         exit(1)
