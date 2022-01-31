@@ -12,6 +12,8 @@ import subprocess
 import secrets
 from datetime import datetime
 import argparse
+import csv
+import sqlite3
 
 import imb
 import qsl_config
@@ -161,16 +163,76 @@ def dump_qsos(qsos_parsed):
     with open(f"mailing-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.json", "w") as f:
         f.write(json.dumps(qsos_parsed, indent=4))
 
+def parse_db():
+    enfile = open('EN.dat', 'r')
+    hdfile = open('HD.dat', 'r')
+    records = {}
+    
+    print("Reading EN.dat")
+    reader = csv.reader(enfile, delimiter='|')
+    for row in reader:
+        record = {}
+        record['identifier'] = row[1]
+        record['callsign'] = row[4]
+        record['firstname'] = row[8].title().replace('"', '')
+        record['lastname'] = row[10].title().replace('"', '')
+        record['address'] = row[15].title().replace('"', '')
+        record['city'] = row[16].title().replace('"', '')
+        record['state'] = row[17].replace('"', '')
+        
+        if len(row[18]) > 5:
+            record['zipcode'] = f"{row[18][0:5]}-{row[18][5:9]}"
+        else:
+            record['zipcode'] = f"{row[18][0:5]}"
+
+        # PO boxes are, hilariously, stored in a weird way; see, e.g., W7WIL, who has PO Box 1651.
+        if len(record['address']) < 5 and len(row) > 19 and len(row[19]) >= 1:
+            record['address'] = f"PO Box {row[19]}"
+        
+        #print(f"I found Operator {firstname} {lastname}, {callsign}, at {address}, {city}, {state} {zipcode}.")
+        records[record['identifier']] = record
+    
+    print("Reading HD.dat")
+    reader = csv.reader(hdfile, delimiter='|')
+    for row in reader:
+        identifier = row[1]
+        active = row[5]
+        if active == 'A':
+            records[identifier]['active'] = 1
+        else:
+            records[identifier]['active'] = 0
+        
+    
+    print("Opening DB")
+    con = sqlite3.connect('uls.db')
+    cur = con.cursor()
+    # Create table
+    cur.execute('''CREATE TABLE IF NOT EXISTS amateurs (identifier text, callsign text, firstname text, lastname text, city text, state text, zipcode text, active integer DEFAULT 0)''')
+    con.commit()
+    
+    for record in records.values():
+        sqlstring = f"INSERT INTO amateurs (identifier, callsign, firstname, lastname, city, state, zipcode, active) VALUES (\"{record['identifier']}\", \"{record['callsign']}\", \"{record['firstname']}\", \"{record['lastname']}\", \"{record['city']}\", \"{record['state']}\", \"{record['zipcode']}\", {record['active']});"
+        #print(sqlstring)
+        cur.execute(sqlstring)
+
+    con.commit()
+    con.close()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Turn an ADIF into QSL card labels.')
-    parser.add_argument('file', metavar="filename", help='the path to the ADIF file', type=open)
+    parser.add_argument('-f', '--file', metavar="filename", help='the path to the ADIF file', type=open)
     parser.add_argument('-d', '--debug', action='store_true', help='run in debug mode (do not print, exit after one label)')
+    parser.add_argument('-p', '--parse_db', action='store_true', help='parse an FCC EN.dat and HD.dat database into a local SQLite db called uls.db')
 
     args = parser.parse_args()
     DEBUG = args.debug
     
-    qsos = parse_adif(args.file)
-    print_qsos(qsos)
-    dump_qsos(qsos)
+    if args.parse_db:
+        parse_db()
+    elif args.file:
+        qsos = parse_adif(args.file)
+        print_qsos(qsos)
+        dump_qsos(qsos)
+    else:
+        exit(1)
