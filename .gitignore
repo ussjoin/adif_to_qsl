@@ -1,4 +1,8 @@
 .DS_Store
 __pycache__
 EN.dat
+HD.dat
 uls.db
+*.json
+labelout.bin
+temp.png
