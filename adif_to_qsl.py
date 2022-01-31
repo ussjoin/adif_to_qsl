@@ -124,7 +124,9 @@ def parse_adif(file_object):
             else:
                 q_p['zip'] = f"{row['zipcode'][0:5]}"
 
-            q_p['serial'] = f"{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}"
+            q_p['serial'] = (f"{secrets.randbelow(10)}{secrets.randbelow(10)}" +
+                f"{secrets.randbelow(10)}{secrets.randbelow(10)}{secrets.randbelow(10)}" +
+                f"{secrets.randbelow(10)}")
             q_p['imbcode'] = imb.encode(int(qsl_config.BARCODE_ID),
                                         int(qsl_config.SERVICE_ID),
                                         int(qsl_config.MY_MAILER_ID),
@@ -148,7 +150,8 @@ def print_qsos(qsos_parsed):
         with Image(width=int(res*4.75), height=int(res*2.4), background = Color('white')) as img:
             # Build the QSL bits, then the address and IMb
             # 2.5" wide left half, 2.25" wide right half ("half")
-            qso_text = f"{qso['date']}\n{qso['time']}\n\n{qso['qth']}\n{qso['frequency']}\n{qso['power']}\n{qso['mode']}\n{qso['signal']}"
+            qso_text = (f"{qso['date']}\n{qso['time']}\n\n{qso['qth']}\n{qso['frequency']}\n" +
+                f"{qso['power']}\n{qso['mode']}\n{qso['signal']}")
             if qso['notes']:
                 qso_text += f"\n\n{qso['notes']}"
             draw_qso = Drawing()
@@ -195,9 +198,9 @@ def print_qsos(qsos_parsed):
                 img.save(filename='temp.png')
                 subprocess.run(
                     ["brother_ql_create --model QL-800 --label-size 62 ./temp.png > labelout.bin"],
-                    shell=True)
+                    shell=True, check=False)
                 subprocess.run([f"brother_ql_print labelout.bin {qsl_config.PRINTER_IDENTIFIER}"],
-                    shell=True)
+                    shell=True, check=False)
                 os.remove('temp.png')
                 os.remove('labelout.bin')
 
@@ -210,7 +213,8 @@ def dump_qsos(qsos_parsed):
     Returns: nothing.
 
     """
-    with open(f"mailing-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.json", "w", encoding="latin-1") as json_file:
+    with open(f"mailing-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.json", "w",
+        encoding="latin-1") as json_file:
         json_file.write(json.dumps(qsos_parsed, indent=4))
 
 def parse_db():
@@ -239,7 +243,8 @@ def parse_db():
                 record['state'] = row[17].replace('"', '')
                 record['zipcode'] = row[18]
 
-                # PO boxes are, hilariously, stored in a weird way; see, e.g., W7WIL, who has PO Box 1651.
+                # PO boxes are, hilariously, stored in a weird way;
+                # see, e.g., W7WIL, who has PO Box 1651.
                 if len(record['address']) < 5 and len(row) > 19 and len(row[19]) >= 1:
                     pobox = row[19].replace('"', '')
                     record['address'] = f"PO Box {pobox}"
@@ -267,11 +272,11 @@ def parse_db():
 
             for record in records.values():
                 cur.execute(" INSERT INTO amateurs " +
-                    "(identifier, callsign, firstname, lastname, address, city, state, zipcode, active) " +
-                    f"VALUES (\"{record['identifier']}\", \"{record['callsign']}\", " +
-                    f"\"{record['firstname']}\", \"{record['lastname']}\", \"{record['address']}\", " +
-                    f"\"{record['city']}\", \"{record['state']}\", \"{record['zipcode']}\", "+
-                    f"{record['active']});")
+                    "(identifier, callsign, firstname, lastname, address, city, state, zipcode, " +
+                    f"active) VALUES (\"{record['identifier']}\", \"{record['callsign']}\", " +
+                    f"\"{record['firstname']}\", \"{record['lastname']}\", " +
+                    f"\"{record['address']}\", \"{record['city']}\", \"{record['state']}\", "+
+                    f" \"{record['zipcode']}\", {record['active']});")
 
             con.commit()
             con.close()
