@@ -127,7 +127,8 @@ def parse_adif(file_object):
                                         int(qsl_config.MY_MAILER_ID),
                                         int(q_p['serial']),
                                         row['zipcode'])
-            qsos_parsed.append(q_p)
+        
+        qsos_parsed.append(q_p)
     return qsos_parsed
 
 def print_qsos(qsos_parsed):
@@ -218,59 +219,60 @@ def parse_db():
     Returns: nothing.
 
     """
-    enfile = open('EN.dat', 'r', encoding="latin-1")
-    hdfile = open('HD.dat', 'r', encoding="latin-1")
-    records = {}
+    with open('EN.dat', 'r', encoding="latin-1") as enfile:
+        with open('HD.dat', 'r', encoding="latin-1") as hdfile:
+            records = {}
 
-    print("Reading EN.dat")
-    reader = csv.reader(enfile, delimiter='|')
-    for row in reader:
-        record = {}
-        record['identifier'] = row[1]
-        record['callsign'] = row[4]
-        record['firstname'] = row[8].title().replace('"', '')
-        record['lastname'] = row[10].title().replace('"', '')
-        record['address'] = row[15].title().replace('"', '')
-        record['city'] = row[16].title().replace('"', '')
-        record['state'] = row[17].replace('"', '')
-        record['zipcode'] = row[18]
+            print("Reading EN.dat")
+            reader = csv.reader(enfile, delimiter='|')
+            for row in reader:
+                record = {}
+                record['identifier'] = row[1]
+                record['callsign'] = row[4]
+                record['firstname'] = row[8].title().replace('"', '')
+                record['lastname'] = row[10].title().replace('"', '')
+                record['address'] = row[15].title().replace('"', '')
+                record['city'] = row[16].title().replace('"', '')
+                record['state'] = row[17].replace('"', '')
+                record['zipcode'] = row[18]
 
-        # PO boxes are, hilariously, stored in a weird way; see, e.g., W7WIL, who has PO Box 1651.
-        if len(record['address']) < 5 and len(row) > 19 and len(row[19]) >= 1:
-            pobox = row[19].replace('"', '')
-            record['address'] = f"PO Box {pobox}"
+                # PO boxes are, hilariously, stored in a weird way; see, e.g., W7WIL, who has PO Box 1651.
+                if len(record['address']) < 5 and len(row) > 19 and len(row[19]) >= 1:
+                    pobox = row[19].replace('"', '')
+                    record['address'] = f"PO Box {pobox}"
 
-        records[record['identifier']] = record
+                records[record['identifier']] = record
 
-    print("Reading HD.dat")
-    reader = csv.reader(hdfile, delimiter='|')
-    for row in reader:
-        identifier = row[1]
-        active = row[5]
-        if active == 'A':
-            records[identifier]['active'] = 1
-        else:
-            records[identifier]['active'] = 0
+            print("Reading HD.dat")
+            reader = csv.reader(hdfile, delimiter='|')
+            for row in reader:
+                identifier = row[1]
+                active = row[5]
+                if active == 'A':
+                    records[identifier]['active'] = 1
+                else:
+                    records[identifier]['active'] = 0
 
-    print("Opening DB")
-    con = sqlite3.connect('uls.db')
-    cur = con.cursor()
-    # Create table
-    cur.execute("CREATE TABLE IF NOT EXISTS amateurs" +
-        "(identifier text, callsign text, firstname text, lastname text, address text, " +
-        "city text, state text, zipcode text, active integer DEFAULT 0)")
-    con.commit()
+            print("Opening DB")
+            con = sqlite3.connect('uls.db')
+            cur = con.cursor()
+            # Create table
+            cur.execute("CREATE TABLE IF NOT EXISTS amateurs" +
+                "(identifier text, callsign text, firstname text, lastname text, address text, " +
+                "city text, state text, zipcode text, active integer DEFAULT 0)")
+            con.commit()
 
-    for record in records.values():
-        cur.execute(" INSERT INTO amateurs " +
-            "(identifier, callsign, firstname, lastname, address, city, state, zipcode, active) " +
-            f"VALUES (\"{record['identifier']}\", \"{record['callsign']}\", " +
-            f"\"{record['firstname']}\", \"{record['lastname']}\", \"{record['address']}\", " +
-            "\"{record['city']}\", \"{record['state']}\", \"{record['zipcode']}\", "+
-            "{record['active']});")
+            for record in records.values():
+                cur.execute(" INSERT INTO amateurs " +
+                    "(identifier, callsign, firstname, lastname, address, city, state, zipcode, active) " +
+                    f"VALUES (\"{record['identifier']}\", \"{record['callsign']}\", " +
+                    f"\"{record['firstname']}\", \"{record['lastname']}\", \"{record['address']}\", " +
+                    f"\"{record['city']}\", \"{record['state']}\", \"{record['zipcode']}\", "+
+                    f"{record['active']});")
 
-    con.commit()
-    con.close()
+            con.commit()
+            con.close()
+    print("Parsing FCC databases to SQLite complete.")
 
 
 if __name__ == "__main__":
